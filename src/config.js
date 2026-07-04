@@ -71,8 +71,9 @@ export const config = {
   },
 
   enrichment: {
-    model: 'claude-opus-4-8',
-    enabled: !!process.env.ANTHROPIC_API_KEY,
+    model: 'gemini-2.5-flash',
+    apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || null,
+    get enabled() { return !!this.apiKey; },
     maxProjectsToCluster: 40,
     maxTrends: 8,
   },

@@ -19,7 +19,7 @@ Optional environment variables:
 | Var | Effect |
 |---|---|
 | `GITHUB_TOKEN` | 5000 req/hr instead of 60 — more queries, more builder enrichment |
-| `ANTHROPIC_API_KEY` | Enables LLM trend clustering + "why it's rising" analysis (Claude Opus 4.8). Without it, trends fall back to keyword grouping |
+| `GOOGLE_API_KEY` | Enables LLM trend clustering + "why it's rising" analysis (Gemini 2.5 Flash). Without it, trends fall back to keyword grouping |
 | `PORT` | Server port (default 4242) |
 
 ## How it works — the process
@@ -47,7 +47,7 @@ Optional environment variables:
 │  pre-discovery profile a scout wants; >10k followers = already found)       │
 └──────────────────────────────┬───────────────────────────────────────────────┘
                                ▼
-┌─────────────── ENRICH (optional, Claude Opus 4.8) ──────────────────────────┐
+┌─────────────── ENRICH (optional, Gemini 2.5 Flash) ─────────────────────────┐
 │  Clusters top-scored projects + HN chatter into named trends with           │
 │  "why it's rising NOW" summaries. Structured JSON output, keyword fallback. │
 └──────────────────────────────┬───────────────────────────────────────────────┘
@@ -73,7 +73,7 @@ acceleration kick in — the feed gets sharper the longer you run it. Run it dai
 | [src/connectors/hackernews.js](src/connectors/hackernews.js) | Show HN + topic chatter via Algolia; URL/name matching to projects |
 | [src/connectors/npm.js](src/connectors/npm.js) | Repository-URL-verified package matching + weekly downloads |
 | [src/pipeline/score.js](src/pipeline/score.js) | The emergence formula |
-| [src/pipeline/enrich.js](src/pipeline/enrich.js) | Claude trend clustering (structured output) + keyword fallback |
+| [src/pipeline/enrich.js](src/pipeline/enrich.js) | Gemini trend clustering (structured output) + keyword fallback |
 | [src/pipeline/run.js](src/pipeline/run.js) | Orchestrator: ingest → score → enrich, run tracking |
 | [src/server.js](src/server.js) | Express API: `/api/feed`, `/api/triage`, `/api/refresh`, `/api/status` |
 | [public/](public/index.html) | Ranked-feed UI with triage |

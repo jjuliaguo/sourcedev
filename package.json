@@ -17,11 +17,13 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.110.0",
+    "@google/genai": "^2.10.0",
     "better-sqlite3": "^12.11.1",
     "express": "^5.2.1"
   },
   "allowScripts": {
-    "better-sqlite3@12.11.1": true
+    "better-sqlite3@12.11.1": true,
+    "@google/genai@2.10.0": true,
+    "protobufjs@7.6.5": true
   }
 }
