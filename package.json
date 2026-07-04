@@ -1,0 +1,24 @@
+{
+  "name": "sourcedev",
+  "version": "0.1.0",
+  "description": "AI-powered sourcing platform for emerging devtool trends and builders",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "ingest": "node src/pipeline/run.js",
+    "serve": "node src/server.js",
+    "start": "node src/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
+    "better-sqlite3": "^12.11.1",
+    "express": "^5.2.1"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true
+  }
+}
