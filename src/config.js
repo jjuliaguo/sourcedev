@@ -3,6 +3,13 @@
 
 import { fileURLToPath } from 'node:url';
 
+// Load .env if present (Node 22 native support) — optional, so no error if missing.
+try {
+  process.loadEnvFile(fileURLToPath(new URL('../.env', import.meta.url)));
+} catch {
+  // no .env file — GITHUB_TOKEN / ANTHROPIC_API_KEY may still come from the shell env
+}
+
 export const config = {
   dbPath: fileURLToPath(new URL('../data/sourcedev.db', import.meta.url)),
 
