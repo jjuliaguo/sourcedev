@@ -11,7 +11,11 @@ try {
 }
 
 export const config = {
-  dbPath: fileURLToPath(new URL('../data/sourcedev.db', import.meta.url)),
+  // DATA_DIR lets a deploy target (e.g. a Railway volume) point this at a
+  // persistent mount without touching code. Defaults to the local data/ folder.
+  dbPath: process.env.DATA_DIR
+    ? `${process.env.DATA_DIR}/sourcedev.db`
+    : fileURLToPath(new URL('../data/sourcedev.db', import.meta.url)),
 
   // How far back "emerging" looks (days). Repos older than this are ignored at ingest.
   windowDays: 90,
