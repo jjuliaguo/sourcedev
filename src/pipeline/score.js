@@ -84,10 +84,15 @@ export function scoreProjects() {
     const regionFactor = owner?.region === 'north_america' ? 1.1
       : owner?.region === 'other' ? 0.85 : 1;
 
-    const total = Math.min(100, base * novelty * corro * regionFactor);
+    // --- focus boost: prioritize the four target problem areas (code quality,
+    // productivity, LLM/token cost, security/IP) over generic AI-agent hype.
+    const focusFactor = W.focusLabels.includes(p.discovered_via) ? W.focusBoost : 1;
+
+    const total = Math.min(100, base * novelty * corro * regionFactor * focusFactor);
 
     saveScore('project', p.id, total, {
       ownerRegion: owner?.region ?? null,
+      isFocusArea: focusFactor > 1,
       stars,
       ageDays: Math.round(ageDays * 10) / 10,
       velocity: Math.round(velocity * 100) / 100,

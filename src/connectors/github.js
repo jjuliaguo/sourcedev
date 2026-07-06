@@ -3,7 +3,7 @@
 // Set GITHUB_TOKEN for 30 req/min search and 5000 req/hr core.
 import { config } from '../config.js';
 import { upsertProject, addSnapshot, upsertBuilder, enrichBuilder, db } from '../db.js';
-import { isMostlyEnglish, classifyRegion, detectUniversity } from '../util.js';
+import { isMostlyEnglish, isConsumerApp, isMirrorOrBoilerplate, classifyRegion, detectUniversity } from '../util.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -46,6 +46,10 @@ export async function ingestGitHub(log = console.log) {
         seen.add(repo.full_name);
         // English-readable feed only.
         if (!isMostlyEnglish(`${repo.name} ${repo.description ?? ''}`)) continue;
+        // Safety net: reject stray consumer/hobby apps a devtool query pulled in.
+        if (isConsumerApp(`${repo.name} ${repo.description ?? ''}`)) continue;
+        // Phrase-search false positive: mirrors / contribution boilerplate.
+        if (isMirrorOrBoilerplate(repo.description ?? '')) continue;
         const projectId = upsertProject({
           full_name: repo.full_name,
           name: repo.name,

@@ -96,6 +96,29 @@ const UNIVERSITIES = [
 const STUDENT_SIGNAL =
   /\b(student|undergrad(uate)?|grad(uate)? student|phd|ph\.d|masters?|m\.s\.|b\.s\.|bs\/ms|sophomore|junior|senior|freshman|studying|intern)\b|'\d{2}\b|class of 20\d{2}|c\/o 20\d{2}|cs @/i;
 
+// ---------------------------------------------------------------------------
+// Safety-net filter: even a well-targeted query occasionally pulls in a
+// consumer/hobby app (e.g. a nutrition tracker tagged "rag" for its food
+// database lookup). Reject obvious non-devtool consumer-app signals.
+
+const CONSUMER_APP_SIGNALS = /\b(diet|nutrition|recipe|meal plan|calorie|fitness tracker|workout|horoscope|astrology|tarot|dating app|matchmaking|meditation|mood tracker|travel itinerary|flight booking|hotel booking|shopping list|grocery)\b/i;
+
+export function isConsumerApp(text) {
+  if (!text) return false;
+  return CONSUMER_APP_SIGNALS.test(text);
+}
+
+// Phrase-search false positive: a repo whose description mentions "code
+// review" as part of its own contribution process (e.g. a read-only mirror),
+// not because the repo IS a code-review tool. Mirrors are also never
+// genuinely emerging original work.
+const MIRROR_OR_BOILERPLATE = /\b(read-only mirror|this is a mirror|mirror of|should be submitted to|please see contributing|see contributing\.md)\b/i;
+
+export function isMirrorOrBoilerplate(text) {
+  if (!text) return false;
+  return MIRROR_OR_BOILERPLATE.test(text);
+}
+
 export function detectUniversity(text) {
   if (!text || !text.trim()) return null;
   for (const [name, re] of UNIVERSITIES) {

@@ -27,11 +27,19 @@ const TREND_SCHEMA = {
 };
 
 function topProjectsForClustering() {
-  return db.prepare(`
+  // Same hard focus-area priority as the feed: without it, generic AI-agent
+  // hype (higher raw star velocity) crowds the target problem areas out of
+  // the small window Gemini sees.
+  const rows = db.prepare(`
     SELECT p.id, p.full_name, p.description, p.language, p.topics, sc.total AS score, sc.breakdown
     FROM projects p JOIN scores sc ON sc.entity_type='project' AND sc.entity_id=p.id
-    ORDER BY sc.total DESC LIMIT ?
-  `).all(config.enrichment.maxProjectsToCluster);
+  `).all().map((r) => ({ ...r, breakdown: JSON.parse(r.breakdown) }));
+  rows.sort((a, b) => {
+    const focusDiff = (b.breakdown.isFocusArea ? 1 : 0) - (a.breakdown.isFocusArea ? 1 : 0);
+    return focusDiff !== 0 ? focusDiff : b.score - a.score;
+  });
+  return rows.slice(0, config.enrichment.maxProjectsToCluster)
+    .map((r) => ({ ...r, breakdown: JSON.stringify(r.breakdown) }));
 }
 
 function recentHnTitles() {
@@ -68,9 +76,13 @@ export async function enrichTrends(log = console.log) {
         systemInstruction:
           'You are a devtools trend analyst for an early-stage VC scout. You cluster emerging ' +
           'open-source projects and technical chatter into named trends. Prioritize what is ' +
-          'EMERGING (accelerating, early, pre-hype) over what is already popular. A good trend ' +
-          'name is specific ("MCP server frameworks", not "AI tools"). Only cluster projects that ' +
-          'genuinely share a technical thesis; leave outliers unclustered.',
+          'EMERGING (accelerating, early, pre-hype) over what is already popular. The scout is ' +
+          'specifically focused on four problem areas: (1) evaluating code quality, (2) measuring ' +
+          'developer/engineering productivity, (3) managing LLM/token cost, and (4) code security ' +
+          'and IP protection — favor trends in these areas over generic "AI coding agent" trends ' +
+          'when the signal is comparable. A good trend name is specific ("LLM cost observability ' +
+          'tools", not "AI tools"). Only cluster projects that genuinely share a technical thesis; ' +
+          'leave outliers unclustered.',
         responseMimeType: 'application/json',
         responseSchema: TREND_SCHEMA,
       },

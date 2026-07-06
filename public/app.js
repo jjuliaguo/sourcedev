@@ -127,6 +127,7 @@ function triageButtons(type, item) {
 
 function projectChips(b, topics) {
   return [
+    b.isFocusArea ? `<span class="chip focus">🎯 Core focus area</span>` : '',
     `<span class="chip">${fmtNum(b.stars)} stars</span>`,
     `<span class="chip ${b.velocity >= 5 ? 'good' : ''}">${b.velocity >= 1 ? Math.round(b.velocity) : b.velocity} new stars a day</span>`,
     b.acceleration > 0 ? `<span class="chip good">Speeding up</span>` : '',

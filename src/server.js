@@ -6,7 +6,7 @@ import { db, setTriage } from './db.js';
 import { runPipeline } from './pipeline/run.js';
 import { fetchAndEnrichBuilder } from './connectors/github.js';
 import { summarizeBuilders } from './pipeline/enrich.js';
-import { isMostlyEnglish } from './util.js';
+import { isMostlyEnglish, isConsumerApp } from './util.js';
 
 const app = express();
 app.use(express.json());
@@ -20,6 +20,9 @@ app.get('/api/feed', (req, res) => {
   const savedOnly = req.query.filter === 'saved';
 
   if (tab === 'projects') {
+    // Fetch all scored candidates (no SQL LIMIT) — focus-area projects often
+    // score lower on raw velocity than generic AI-agent hype, so cutting to
+    // the top N by score *before* the focus-priority sort would drop them.
     let rows = db.prepare(`
       SELECT p.id, p.full_name, p.name, p.url, p.description, p.language, p.topics,
              p.owner_login, p.repo_created_at, p.discovered_via,
@@ -27,11 +30,22 @@ app.get('/api/feed', (req, res) => {
       FROM projects p
       JOIN scores sc ON sc.entity_type='project' AND sc.entity_id=p.id
       LEFT JOIN triage t ON t.entity_type='project' AND t.entity_id=p.id
-      ORDER BY sc.total DESC LIMIT 150
     `).all();
     rows = filterTriage(rows, includeDismissed, savedOnly)
-      .filter((r) => isMostlyEnglish(`${r.name} ${r.description ?? ''}`));
-    return res.json(rows.map((r) => ({ ...r, topics: JSON.parse(r.topics || '[]'), breakdown: JSON.parse(r.breakdown || '{}') })));
+      .filter((r) => isMostlyEnglish(`${r.name} ${r.description ?? ''}`))
+      .filter((r) => !isConsumerApp(`${r.name} ${r.description ?? ''}`))
+      .map((r) => ({ ...r, topics: JSON.parse(r.topics || '[]'), breakdown: JSON.parse(r.breakdown || '{}') }));
+
+    // Hard categorical priority: your four target problem areas (code quality,
+    // productivity, LLM/token cost, security/IP) always rank above generic
+    // devtool/agent projects, regardless of raw score — a soft multiplier
+    // alone can't reliably beat the star-count gap generic AI-agent hype has.
+    rows.sort((a, b) => {
+      const focusDiff = (b.breakdown.isFocusArea ? 1 : 0) - (a.breakdown.isFocusArea ? 1 : 0);
+      return focusDiff !== 0 ? focusDiff : b.score - a.score;
+    });
+
+    return res.json(rows.slice(0, 150));
   }
 
   if (tab === 'builders') {
