@@ -3,7 +3,7 @@
 // Set GITHUB_TOKEN for 30 req/min search and 5000 req/hr core.
 import { config } from '../config.js';
 import { upsertProject, addSnapshot, upsertBuilder, enrichBuilder, db } from '../db.js';
-import { isMostlyEnglish } from '../util.js';
+import { isMostlyEnglish, classifyRegion, detectUniversity } from '../util.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -83,14 +83,15 @@ export async function ingestGitHub(log = console.log) {
     if (!config.github.token) await sleep(6500);
   }
 
-  // Enrich a handful of builders (owners of highest-starred fresh repos) with user details.
+  // Enrich builders (owners of highest-starred fresh repos) with user details.
   // Costs 1 core request each — keep small when unauthenticated.
-  const budget = config.github.token ? 20 : 6;
+  // enriched < 2 also re-fetches rows enriched before location/region tracking existed.
+  const budget = config.github.token ? 100 : 6;
   const toEnrich = db.prepare(`
     SELECT b.login FROM builders b
     JOIN projects p ON p.owner_login = b.login
     JOIN snapshots s ON s.project_id = p.id
-    WHERE b.enriched = 0
+    WHERE b.enriched < 2
     GROUP BY b.login ORDER BY MAX(s.stars) DESC LIMIT ?
   `).all(budget);
   for (const { login } of toEnrich) {
@@ -108,10 +109,16 @@ export async function ingestGitHub(log = console.log) {
 // Used at ingest and on-demand when a profile is opened in the UI.
 export async function fetchAndEnrichBuilder(login) {
   const u = await ghFetch(`${config.github.apiBase}/users/${login}`);
+  // Derived signals: region from location, university from bio + company.
+  const uni = detectUniversity(`${u.bio ?? ''} ${u.company ?? ''}`);
   const details = {
     name: u.name ?? null, followers: u.followers ?? 0, public_repos: u.public_repos ?? 0,
     bio: u.bio ?? null, company: u.company ?? null, blog: u.blog ?? null,
     twitter: u.twitter_username ?? null,
+    location: u.location ?? null,
+    region: classifyRegion(u.location ?? ''),
+    university: uni?.university ?? null,
+    is_student: uni?.isStudent ? 1 : 0,
   };
   enrichBuilder(login, details);
   return details;

@@ -79,9 +79,15 @@ export function scoreProjects() {
     }
     corro = Math.min(corro, c.maxMultiplier);
 
-    const total = Math.min(100, base * novelty * corro);
+    // --- lead geography: prefer North America (via the repo owner's location)
+    const owner = db.prepare(`SELECT region FROM builders WHERE login=?`).get(p.owner_login);
+    const regionFactor = owner?.region === 'north_america' ? 1.1
+      : owner?.region === 'other' ? 0.85 : 1;
+
+    const total = Math.min(100, base * novelty * corro * regionFactor);
 
     saveScore('project', p.id, total, {
+      ownerRegion: owner?.region ?? null,
       stars,
       ageDays: Math.round(ageDays * 10) / 10,
       velocity: Math.round(velocity * 100) / 100,
@@ -119,6 +125,15 @@ export function scoreBuilders() {
       if (b.followers != null && b.followers < 500) total *= 1.15;
       else if (b.followers > 10000) total *= 0.8;
     }
+
+    // Lead geography: North America preferred.
+    const regionFactor = b.region === 'north_america' ? 1.2 : b.region === 'other' ? 0.7 : 1;
+    total *= regionFactor;
+
+    // Top-university signal: students at top-50 schools are the highest-value profile.
+    const uniFactor = b.university ? (b.is_student ? 1.3 : 1.15) : 1;
+    total *= uniFactor;
+
     total = Math.min(100, total);
 
     saveScore('builder', b.id, total, {
@@ -126,6 +141,10 @@ export function scoreBuilders() {
       bestProjectScore: Math.round(best.total * 10) / 10,
       followers: b.followers,
       indieBonus: b.enriched ? (b.followers < 500 ? 1.15 : b.followers > 10000 ? 0.8 : 1) : null,
+      location: b.location ?? null,
+      region: b.region ?? null,
+      university: b.university ?? null,
+      isStudent: !!b.is_student,
     });
     scored++;
   }

@@ -104,6 +104,17 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 `);
 
+// Idempotent migrations for columns added after the initial schema shipped.
+for (const col of [
+  'location TEXT',            // free-text GitHub location
+  'region TEXT',              // north_america | other | NULL (unknown)
+  'university TEXT',          // matched top-50 university, if any
+  'is_student INTEGER DEFAULT 0',
+  'profile_summary TEXT',     // LLM-written scout-oriented description
+]) {
+  try { db.exec(`ALTER TABLE builders ADD COLUMN ${col}`); } catch { /* column exists */ }
+}
+
 // ---- helpers ----
 
 export function upsertProject(p) {
@@ -136,9 +147,15 @@ export function upsertBuilder(b) {
 export function enrichBuilder(login, d) {
   db.prepare(`
     UPDATE builders SET name=@name, followers=@followers, public_repos=@public_repos,
-      bio=@bio, company=@company, blog=@blog, twitter=@twitter, enriched=1
+      bio=@bio, company=@company, blog=@blog, twitter=@twitter,
+      location=@location, region=@region, university=@university, is_student=@is_student,
+      enriched=2
     WHERE login=@login
   `).run({ login, ...d });
+}
+
+export function saveBuilderSummary(login, summary) {
+  db.prepare(`UPDATE builders SET profile_summary=? WHERE login=?`).run(summary, login);
 }
 
 export function upsertMention(m) {

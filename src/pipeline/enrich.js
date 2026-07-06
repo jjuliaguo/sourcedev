@@ -3,7 +3,7 @@
 // "why it's rising" summaries. Falls back to keyword grouping when no key.
 import { GoogleGenAI, Type } from '@google/genai';
 import { config } from '../config.js';
-import { db, saveTrend } from '../db.js';
+import { db, saveTrend, saveBuilderSummary } from '../db.js';
 
 const TREND_SCHEMA = {
   type: Type.OBJECT,
@@ -93,6 +93,101 @@ export async function enrichTrends(log = console.log) {
   } catch (e) {
     log(`  [enrich] LLM failed (${e.message}) — falling back to keyword grouping`);
     return keywordFallback(projects, log);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Builder profile summaries: 1-2 sentence scout-oriented descriptions.
+
+const PROFILE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    profiles: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          login: { type: Type.STRING, description: 'GitHub login, exactly as given' },
+          summary: { type: Type.STRING, description: '1-2 sentences: who they are, what they are building, and why a scout should care. Plain English, no fluff.' },
+        },
+        required: ['login', 'summary'],
+      },
+    },
+  },
+  required: ['profiles'],
+};
+
+function builderContext(b) {
+  const projects = db.prepare(`
+    SELECT p.name, p.description, s.stars FROM projects p
+    JOIN (SELECT project_id, MAX(stars) stars FROM snapshots GROUP BY project_id) s ON s.project_id = p.id
+    WHERE p.owner_login=? ORDER BY s.stars DESC LIMIT 3
+  `).all(b.login);
+  const parts = [
+    `login=${b.login}`,
+    b.name ? `name: ${b.name}` : '',
+    b.bio ? `bio: ${b.bio}` : '',
+    b.company ? `company: ${b.company}` : '',
+    b.location ? `location: ${b.location}` : '',
+    b.university ? `university: ${b.university}${b.is_student ? ' (student)' : ''}` : '',
+    b.followers != null ? `followers: ${b.followers}` : '',
+    `projects: ${projects.map((p) => `${p.name} (${p.stars}★) — ${p.description?.slice(0, 120) ?? ''}`).join(' | ')}`,
+  ];
+  return parts.filter(Boolean).join('\n');
+}
+
+// Summarize the given builder rows via one Gemini call. Used batch-wise by the
+// pipeline and one-at-a-time by the profile endpoint. Returns count written.
+export async function summarizeBuilders(builders, log = console.log) {
+  if (!config.enrichment.enabled || !builders.length) return 0;
+  const client = new GoogleGenAI({ apiKey: config.enrichment.apiKey });
+
+  const response = await client.models.generateContent({
+    model: config.enrichment.model,
+    contents:
+      'Write a profile summary for each of these builders.\n\n' +
+      builders.map((b) => `---\n${builderContext(b)}`).join('\n'),
+    config: {
+      systemInstruction:
+        'You write short builder profiles for an early-stage VC scout hunting pre-company ' +
+        'devtool founders. For each builder: 1-2 sentences covering who they are, what they ' +
+        'are building (in concrete terms — what the tool actually does), and the strongest ' +
+        'signal (momentum, background, university, launch). Direct and factual; never invent ' +
+        'details not present in the data. Do not start with the person\'s name or "is a".',
+      responseMimeType: 'application/json',
+      responseSchema: PROFILE_SCHEMA,
+    },
+  });
+
+  const { profiles } = JSON.parse(response.text ?? '{}');
+  let written = 0;
+  const known = new Set(builders.map((b) => b.login));
+  for (const p of profiles ?? []) {
+    if (known.has(p.login) && p.summary?.trim()) {
+      saveBuilderSummary(p.login, p.summary.trim());
+      written++;
+    }
+  }
+  return written;
+}
+
+// Pipeline step: batch-summarize the top-scored builders that lack a summary.
+export async function enrichBuilderProfiles(log = console.log) {
+  if (!config.enrichment.enabled) return { summaries: 0, mode: 'skipped-no-key' };
+  const builders = db.prepare(`
+    SELECT b.* FROM builders b
+    JOIN scores sc ON sc.entity_type='builder' AND sc.entity_id=b.id
+    WHERE b.profile_summary IS NULL AND b.enriched > 0
+    ORDER BY sc.total DESC LIMIT 40
+  `).all();
+  if (!builders.length) return { summaries: 0, mode: 'none-needed' };
+  try {
+    const written = await summarizeBuilders(builders, log);
+    log(`  [enrich] wrote ${written} builder profile summaries`);
+    return { summaries: written, mode: 'llm' };
+  } catch (e) {
+    log(`  [enrich] profile summaries failed (${e.message}) — cards fall back to raw bios`);
+    return { summaries: 0, mode: 'failed' };
   }
 }
 

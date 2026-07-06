@@ -166,12 +166,14 @@ function builderCard(b) {
       <div class="card-title">
         <span class="name">${esc(b.name || b.login)}</span>
         ${b.name ? `<span class="lang">${esc(b.login)}</span>` : ''}
+        ${b.university ? `<span class="chip uni">🎓 ${esc(b.university)}${b.is_student ? ' student' : ''}</span>` : ''}
       </div>
-      <div class="desc">${esc(b.bio ?? '')}</div>
+      <div class="desc">${esc(b.profile_summary || b.bio || '')}</div>
       <div class="chips">
         <span class="chip good">Building ${esc((d.bestProject || '').split('/')[1] || d.bestProject)}</span>
+        ${b.location ? `<span class="chip ${b.region === 'north_america' ? 'info' : ''}">📍 ${esc(b.location)}</span>` : ''}
         ${b.followers != null ? `<span class="chip ${b.followers < 500 ? 'notable' : ''}">${fmtNum(b.followers)} followers${b.followers < 500 ? ' — not widely known yet' : ''}</span>` : ''}
-        ${b.company ? `<span class="chip">${esc(b.company)}</span>` : ''}
+        ${b.company && !b.university ? `<span class="chip">${esc(b.company)}</span>` : ''}
       </div>
     </div>`;
   card.appendChild(triageButtons('builder', b));
@@ -224,8 +226,9 @@ async function openProjectProfile(id) {
       <img class="avatar" src="${esc(p.owner.avatar_url)}" alt="" />
       <div>
         <a href="${esc(p.owner.url)}" target="_blank" rel="noopener">${esc(p.owner.name || p.owner.login)}</a>
-        <div class="meta">${esc(p.owner.bio ?? '')}</div>
-        ${p.owner.followers != null ? `<div class="meta">${fmtNum(p.owner.followers)} followers</div>` : ''}
+        ${p.owner.university ? `<span class="chip uni">🎓 ${esc(p.owner.university)}${p.owner.is_student ? ' student' : ''}</span>` : ''}
+        <div class="meta">${esc(p.owner.profile_summary || p.owner.bio || '')}</div>
+        <div class="meta">${[p.owner.location, p.owner.followers != null ? fmtNum(p.owner.followers) + ' followers' : ''].filter(Boolean).join(' · ')}</div>
       </div>
     </div>` : '';
 
@@ -277,6 +280,11 @@ async function openBuilderProfile(id) {
       <div class="meta">${m.is_show_hn ? 'Show HN · ' : ''}${m.points} points</div>
     </div>`).join('');
 
+  const badges = [
+    b.university ? `<span class="chip uni">🎓 ${esc(b.university)}${b.is_student ? ' student' : ''}</span>` : '',
+    b.location ? `<span class="chip ${b.region === 'north_america' ? 'info' : ''}">📍 ${esc(b.location)}</span>` : '',
+  ].filter(Boolean).join(' ');
+
   profileBody.innerHTML = `
     <div class="p-header">
       <img class="avatar" src="${esc(b.avatar_url)}" alt="" />
@@ -285,7 +293,9 @@ async function openBuilderProfile(id) {
         <div class="p-sub">${esc([b.login, b.company].filter(Boolean).join(' · '))}</div>
       </div>
     </div>
-    ${b.bio ? `<div class="p-desc">${esc(b.bio)}</div>` : ''}
+    ${badges ? `<div class="chips" style="margin:8px 0;">${badges}</div>` : ''}
+    ${b.profile_summary ? `<div class="p-desc"><strong>Why they're interesting:</strong> ${esc(b.profile_summary)}</div>` : ''}
+    ${b.bio ? `<div class="p-desc" style="color:var(--text-faint);">"${esc(b.bio)}"</div>` : ''}
     <div class="p-links">${links}</div>
     <div class="p-section"><h3>At a glance</h3><div class="stat-grid">${stats}</div></div>
     ${projects ? `<div class="p-section"><h3>What they're building</h3><div class="p-list">${projects}</div></div>` : ''}

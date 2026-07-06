@@ -4,7 +4,7 @@ import { ingestGitHub } from '../connectors/github.js';
 import { ingestHackerNews } from '../connectors/hackernews.js';
 import { ingestNpm } from '../connectors/npm.js';
 import { scoreAll } from './score.js';
-import { enrichTrends } from './enrich.js';
+import { enrichTrends, enrichBuilderProfiles } from './enrich.js';
 import { startRun, finishRun } from '../db.js';
 
 export async function runPipeline(log = console.log) {
@@ -23,8 +23,9 @@ export async function runPipeline(log = console.log) {
     log('▶ 4/5 Scoring (velocity × novelty × corroboration)');
     stats.scoring = scoreAll();
 
-    log('▶ 5/5 Trend enrichment');
+    log('▶ 5/5 Trend + profile enrichment');
     stats.enrichment = await enrichTrends(log);
+    stats.profiles = await enrichBuilderProfiles(log);
 
     finishRun(runId, 'ok', stats);
     log('✔ Pipeline complete: ' + JSON.stringify(stats));

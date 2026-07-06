@@ -5,6 +5,7 @@ import { config } from './config.js';
 import { db, setTriage } from './db.js';
 import { runPipeline } from './pipeline/run.js';
 import { fetchAndEnrichBuilder } from './connectors/github.js';
+import { summarizeBuilders } from './pipeline/enrich.js';
 import { isMostlyEnglish } from './util.js';
 
 const app = express();
@@ -36,6 +37,7 @@ app.get('/api/feed', (req, res) => {
   if (tab === 'builders') {
     let rows = db.prepare(`
       SELECT b.id, b.login, b.name, b.url, b.avatar_url, b.followers, b.bio, b.company, b.blog, b.twitter,
+             b.location, b.region, b.university, b.is_student, b.profile_summary,
              sc.total AS score, sc.breakdown, t.status AS triage
       FROM builders b
       JOIN scores sc ON sc.entity_type='builder' AND sc.entity_id=b.id
@@ -113,11 +115,20 @@ app.get('/api/builder/:id', async (req, res) => {
   if (!b) return res.status(404).json({ error: 'not found' });
 
   // First profile open: pull their details live from GitHub so the profile is ready.
-  if (!b.enriched) {
+  // enriched < 2 also refreshes rows saved before location/university tracking existed.
+  if (b.enriched < 2) {
     try {
       await fetchAndEnrichBuilder(b.login);
       b = { ...b, ...db.prepare(`SELECT * FROM builders WHERE id=?`).get(b.id) };
     } catch { /* rate limited — show what we have */ }
+  }
+
+  // Generate the scout-oriented description on first open if the pipeline hasn't yet.
+  if (!b.profile_summary) {
+    try {
+      await summarizeBuilders([b]);
+      b = { ...b, ...db.prepare(`SELECT * FROM builders WHERE id=?`).get(b.id) };
+    } catch { /* no key or LLM error — bio is the fallback */ }
   }
 
   const projects = db.prepare(`
