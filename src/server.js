@@ -6,7 +6,7 @@ import { db, setTriage } from './db.js';
 import { runPipeline } from './pipeline/run.js';
 import { fetchAndEnrichBuilder } from './connectors/github.js';
 import { summarizeBuilders } from './pipeline/enrich.js';
-import { isMostlyEnglish, isConsumerApp } from './util.js';
+import { isMostlyEnglish, isConsumerApp, isMirrorOrBoilerplate } from './util.js';
 
 const app = express();
 app.use(express.json());
@@ -34,6 +34,7 @@ app.get('/api/feed', (req, res) => {
     rows = filterTriage(rows, includeDismissed, savedOnly)
       .filter((r) => isMostlyEnglish(`${r.name} ${r.description ?? ''}`))
       .filter((r) => !isConsumerApp(`${r.name} ${r.description ?? ''}`))
+      .filter((r) => !isMirrorOrBoilerplate(r.description ?? ''))
       .map((r) => ({ ...r, topics: JSON.parse(r.topics || '[]'), breakdown: JSON.parse(r.breakdown || '{}') }));
 
     // Hard categorical priority: your four target problem areas (code quality,
