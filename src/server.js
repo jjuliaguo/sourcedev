@@ -191,14 +191,44 @@ app.post('/api/triage', (req, res) => {
 let running = false;
 let lastLog = [];
 
-app.post('/api/refresh', (req, res) => {
-  if (running) return res.status(409).json({ error: 'pipeline already running' });
+function startRefresh(trigger) {
+  if (running) return false;
   running = true;
   lastLog = [];
   const log = (line) => { lastLog.push(line); console.log(line); };
+  log(`(refresh triggered: ${trigger})`);
   runPipeline(log).finally(() => { running = false; });
+  return true;
+}
+
+app.post('/api/refresh', (req, res) => {
+  if (!startRefresh('manual')) return res.status(409).json({ error: 'pipeline already running' });
   res.json({ ok: true, started: true });
 });
+
+// ---- auto-refresh scheduler ----
+// The acceleration signal needs regular star snapshots, so the feed sharpens
+// with daily runs. The service is always-on, so it schedules itself: every
+// half hour, run the pipeline if the last successful run is older than
+// AUTO_REFRESH_HOURS. Reading the runs table (not an in-memory timer) makes
+// this survive restarts/redeploys without drift or double-runs.
+function autoRefreshCheck() {
+  if (running) return;
+  const last = db.prepare(`SELECT finished_at FROM runs WHERE status='ok' ORDER BY id DESC LIMIT 1`).get();
+  const ageHours = last
+    ? (Date.now() - new Date(last.finished_at + 'Z').getTime()) / 3_600_000
+    : Infinity;
+  if (ageHours >= config.server.autoRefreshHours) {
+    console.log(`auto-refresh: last successful run ${last ? ageHours.toFixed(1) + 'h ago' : 'never'} → starting pipeline`);
+    startRefresh('auto');
+  }
+}
+
+if (config.server.autoRefreshHours > 0) {
+  setInterval(autoRefreshCheck, 30 * 60_000);
+  setTimeout(autoRefreshCheck, 60_000); // first check shortly after boot
+  console.log(`auto-refresh enabled: every ${config.server.autoRefreshHours}h`);
+}
 
 app.get('/api/status', (req, res) => {
   const lastRun = db.prepare(`SELECT * FROM runs ORDER BY id DESC LIMIT 1`).get();

@@ -131,5 +131,12 @@ export const config = {
     maxTrends: 8,
   },
 
-  server: { port: Number(process.env.PORT) || 4242 },
+  server: {
+    port: Number(process.env.PORT) || 4242,
+    // Run the pipeline automatically when the last successful run is older
+    // than this many hours. 0 disables. Checked every 30 minutes.
+    autoRefreshHours: process.env.AUTO_REFRESH_HOURS !== undefined
+      ? Number(process.env.AUTO_REFRESH_HOURS)
+      : 24,
+  },
 };
