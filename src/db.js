@@ -54,7 +54,9 @@ CREATE TABLE IF NOT EXISTS mentions (
 );
 CREATE INDEX IF NOT EXISTS idx_mentions_project ON mentions(project_id);
 
--- npm adoption confirmation.
+-- npm/PyPI adoption confirmation. name is internally stored as
+-- "registry:package" so an npm and PyPI package can never collide on the
+-- UNIQUE constraint; display_name is the human-readable package name.
 CREATE TABLE IF NOT EXISTS packages (
   id INTEGER PRIMARY KEY,
   name TEXT UNIQUE NOT NULL,
@@ -114,6 +116,17 @@ for (const col of [
 ]) {
   try { db.exec(`ALTER TABLE builders ADD COLUMN ${col}`); } catch { /* column exists */ }
 }
+for (const col of ['registry TEXT DEFAULT \'npm\'', 'display_name TEXT']) {
+  try { db.exec(`ALTER TABLE packages ADD COLUMN ${col}`); } catch { /* column exists */ }
+}
+// Backfill rows written before the registry/display_name columns existed:
+// their `name` is still the plain package name (no registry prefix).
+db.exec(`
+  UPDATE packages SET display_name = name, registry = 'npm'
+  WHERE display_name IS NULL AND name NOT LIKE 'npm:%' AND name NOT LIKE 'pypi:%';
+  UPDATE packages SET name = 'npm:' || name
+  WHERE registry = 'npm' AND name NOT LIKE 'npm:%';
+`);
 
 // ---- helpers ----
 
@@ -167,15 +180,21 @@ export function upsertMention(m) {
   `).run(m);
 }
 
-export function upsertPackage(name, projectId, weeklyDownloads) {
+export function upsertPackage(displayName, projectId, weeklyDownloads, registry = 'npm') {
+  const internalName = `${registry}:${displayName}`;
   db.prepare(`
-    INSERT INTO packages (name, project_id, weekly_downloads)
-    VALUES (?, ?, ?)
+    INSERT INTO packages (name, display_name, registry, project_id, weekly_downloads)
+    VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(name) DO UPDATE SET
       prev_weekly_downloads=packages.weekly_downloads,
       weekly_downloads=excluded.weekly_downloads,
       captured_at=datetime('now')
-  `).run(name, projectId, weeklyDownloads);
+  `).run(internalName, displayName, registry, projectId, weeklyDownloads);
+}
+
+// A project may now have both an npm and a PyPI match.
+export function getPackagesForProject(projectId) {
+  return db.prepare(`SELECT display_name, registry, weekly_downloads, prev_weekly_downloads FROM packages WHERE project_id=?`).all(projectId);
 }
 
 export function saveScore(entityType, entityId, total, breakdown) {

@@ -65,11 +65,35 @@ export const config = {
     minPoints: 3,
   },
 
+  // Reddit — same role as HN (earliest trend signal + corroboration), but a
+  // different community. r/ExperiencedDevs and r/devops surface productivity/
+  // security discussion that rarely reaches HN's front page.
+  // Requires OAuth (client_credentials) — Reddit's unauthenticated .json API
+  // blocks datacenter/cloud IPs outright, so a plain fetch won't work from
+  // any server host (confirmed: 403 from both local testing and would occur
+  // on Railway). Create a free "script" app at reddit.com/prefs/apps.
+  reddit: {
+    clientId: process.env.REDDIT_CLIENT_ID || null,
+    clientSecret: process.env.REDDIT_CLIENT_SECRET || null,
+    get enabled() { return !!(this.clientId && this.clientSecret); },
+    subreddits: ['programming', 'ExperiencedDevs', 'devops'],
+    minScore: 5,
+    userAgent: 'sourcedev-pipeline/0.1 (devtool sourcing bot)',
+  },
+
   // npm registry — adoption confirmation for top-scored projects.
   npm: {
     registryBase: 'https://registry.npmjs.org',
     downloadsBase: 'https://api.npmjs.org/downloads/point',
     // Only try to match packages for the top N projects (1-2 requests each).
+    maxProjectsToCheck: 25,
+  },
+
+  // PyPI — same role as npm, for the Python-first tools npm can't see
+  // (a lot of LLM-cost and code-quality tooling is Python, not JS).
+  pypi: {
+    jsonBase: 'https://pypi.org/pypi',
+    statsBase: 'https://pypistats.org/api/packages',
     maxProjectsToCheck: 25,
   },
 

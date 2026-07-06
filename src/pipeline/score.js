@@ -3,7 +3,7 @@
 // Principles: reward the second derivative, decay as things get known,
 // multiply when independent sources agree.
 import { config } from '../config.js';
-import { db, saveScore } from '../db.js';
+import { db, saveScore, getPackagesForProject } from '../db.js';
 
 const W = config.scoring;
 
@@ -57,11 +57,12 @@ export function scoreProjects() {
 
     // --- corroboration: independent sources agreeing
     const mentions = db.prepare(
-      `SELECT points, is_show_hn FROM mentions WHERE project_id=?`
+      `SELECT source, points, is_show_hn FROM mentions WHERE project_id=?`
     ).all(p.id);
-    const pkg = db.prepare(
-      `SELECT weekly_downloads, prev_weekly_downloads FROM packages WHERE project_id=?`
-    ).get(p.id);
+    const hnMentionCount = mentions.filter((m) => m.source === 'hn').length;
+    const redditMentionCount = mentions.filter((m) => m.source.startsWith('reddit')).length;
+    // A project can now have both an npm and a PyPI match.
+    const packages = getPackagesForProject(p.id);
 
     let corro = 1;
     const c = W.corroboration;
@@ -70,8 +71,12 @@ export function scoreProjects() {
       if (m.is_show_hn) corro += c.perHnMention; // launch intent bonus
     }
     let npmGrowing = false;
-    if (pkg?.weekly_downloads) {
-      corro += c.npmGrowthBoost * 0.5; // exists on npm at all = mild confirmation
+    // Combined across registries: best weekly-download figure for display,
+    // corroboration boost applies once per registry that confirms adoption.
+    const bestPkg = packages.reduce((best, pk) =>
+      (pk.weekly_downloads ?? 0) > (best?.weekly_downloads ?? 0) ? pk : best, null);
+    for (const pkg of packages) {
+      corro += c.npmGrowthBoost * 0.5; // exists on a registry at all = mild confirmation
       if (pkg.prev_weekly_downloads && pkg.weekly_downloads > pkg.prev_weekly_downloads * 1.1) {
         corro += c.npmGrowthBoost; // actually growing
         npmGrowing = true;
@@ -101,8 +106,10 @@ export function scoreProjects() {
       base: Math.round(base * 10) / 10,
       novelty: Math.round(novelty * 100) / 100,
       corroboration: Math.round(corro * 100) / 100,
-      hnMentions: mentions.length,
-      npmWeeklyDownloads: pkg?.weekly_downloads ?? null,
+      hnMentions: hnMentionCount,
+      redditMentions: redditMentionCount,
+      npmWeeklyDownloads: bestPkg?.weekly_downloads ?? null,
+      packageRegistry: bestPkg?.registry ?? null,
       npmGrowing,
     });
     scored++;

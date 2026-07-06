@@ -2,7 +2,7 @@
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
-import { db, setTriage } from './db.js';
+import { db, setTriage, getPackagesForProject } from './db.js';
 import { runPipeline } from './pipeline/run.js';
 import { fetchAndEnrichBuilder } from './connectors/github.js';
 import { summarizeBuilders } from './pipeline/enrich.js';
@@ -100,9 +100,9 @@ app.get('/api/project/:id', (req, res) => {
     `SELECT stars, forks, captured_at FROM snapshots WHERE project_id=? ORDER BY captured_at ASC`
   ).all(p.id);
   const mentions = db.prepare(
-    `SELECT title, url, points, comments, posted_at, is_show_hn FROM mentions WHERE project_id=? ORDER BY points DESC`
+    `SELECT source, title, url, points, comments, posted_at, is_show_hn FROM mentions WHERE project_id=? ORDER BY points DESC`
   ).all(p.id);
-  const pkg = db.prepare(`SELECT * FROM packages WHERE project_id=?`).get(p.id);
+  const packages = getPackagesForProject(p.id);
   const owner = db.prepare(`
     SELECT b.*, sc.total AS score FROM builders b
     LEFT JOIN scores sc ON sc.entity_type='builder' AND sc.entity_id=b.id
@@ -117,7 +117,7 @@ app.get('/api/project/:id', (req, res) => {
     topics: JSON.parse(p.topics || '[]'),
     breakdown: JSON.parse(p.breakdown || '{}'),
     triage: triage?.status ?? null,
-    snapshots, mentions, package: pkg ?? null, owner: owner ?? null,
+    snapshots, mentions, packages, owner: owner ?? null,
   });
 });
 
@@ -152,9 +152,9 @@ app.get('/api/builder/:id', async (req, res) => {
     WHERE p.owner_login=? ORDER BY sc.total DESC
   `).all(b.login).map((r) => ({ ...r, breakdown: JSON.parse(r.breakdown || '{}') }));
 
-  // HN activity around their projects — corroboration a scout can click through.
+  // HN/Reddit activity around their projects — corroboration a scout can click through.
   const mentions = db.prepare(`
-    SELECT m.title, m.url, m.points, m.posted_at, m.is_show_hn
+    SELECT m.source, m.title, m.url, m.points, m.posted_at, m.is_show_hn
     FROM mentions m JOIN projects p ON p.id = m.project_id
     WHERE p.owner_login=? ORDER BY m.points DESC LIMIT 10
   `).all(b.login);

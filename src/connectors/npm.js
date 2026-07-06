@@ -37,8 +37,8 @@ export async function ingestNpm(log = console.log) {
     try {
       stats.checked++;
       // Reuse an already-known package mapping if we have one.
-      const known = db.prepare(`SELECT name FROM packages WHERE project_id=?`).get(project.id);
-      const pkgName = known?.name ?? (await findPackageForProject(project));
+      const known = db.prepare(`SELECT display_name FROM packages WHERE project_id=? AND registry='npm'`).get(project.id);
+      const pkgName = known?.display_name ?? (await findPackageForProject(project));
       if (!pkgName) continue;
       const dl = await jsonFetch(
         `${config.npm.downloadsBase}/last-week/${encodeURIComponent(pkgName)}`

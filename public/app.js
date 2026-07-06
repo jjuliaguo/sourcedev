@@ -101,6 +101,20 @@ function ageWords(days) {
   return `${Math.round(days / 30)} months old`;
 }
 
+function packageLink(pkg) {
+  const url = pkg.registry === 'pypi'
+    ? `https://pypi.org/project/${encodeURIComponent(pkg.display_name)}/`
+    : `https://www.npmjs.com/package/${encodeURIComponent(pkg.display_name)}`;
+  const label = pkg.registry === 'pypi' ? 'View on PyPI →' : 'View on npm →';
+  return `<a href="${esc(url)}" target="_blank" rel="noopener">${label}</a>`;
+}
+
+function mentionSourceLabel(m) {
+  if (m.is_show_hn) return 'Show HN · ';
+  if (m.source?.startsWith('reddit:')) return `r/${m.source.split(':')[1]} · `;
+  return '';
+}
+
 function triageButtons(type, item) {
   const div = document.createElement('div');
   div.className = 'actions';
@@ -133,6 +147,7 @@ function projectChips(b, topics) {
     b.acceleration > 0 ? `<span class="chip good">Speeding up</span>` : '',
     `<span class="chip">${ageWords(b.ageDays)}</span>`,
     b.hnMentions ? `<span class="chip notable">Talked about on Hacker News</span>` : '',
+    b.redditMentions ? `<span class="chip notable">Talked about on Reddit</span>` : '',
     b.npmWeeklyDownloads ? `<span class="chip ${b.npmGrowing ? 'good' : 'info'}">${fmtNum(b.npmWeeklyDownloads)} downloads/week${b.npmGrowing ? ', growing' : ''}</span>` : '',
     ...(topics || []).slice(0, 3).map((t) => `<span class="chip">${esc(t)}</span>`),
   ].join('');
@@ -212,14 +227,15 @@ async function openProjectProfile(id) {
     [`${b.velocity >= 1 ? Math.round(b.velocity) : b.velocity}/day`, 'new stars'],
     [ageWords(b.ageDays), 'repo age'],
     [Math.round(p.score ?? 0), 'momentum'],
-    b.npmWeeklyDownloads ? [fmtNum(b.npmWeeklyDownloads), 'npm downloads/wk'] : null,
+    b.npmWeeklyDownloads ? [fmtNum(b.npmWeeklyDownloads), (b.packageRegistry || 'npm') + ' downloads/wk'] : null,
     b.hnMentions ? [b.hnMentions, 'Hacker News posts'] : null,
+    b.redditMentions ? [b.redditMentions, 'Reddit posts'] : null,
   ].filter(Boolean).map(([v, k]) => `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
 
   const mentions = (p.mentions || []).map((m) => `
     <div class="p-item">
       <a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.title)}</a>
-      <div class="meta">${m.is_show_hn ? 'Show HN · ' : ''}${m.points} points · ${new Date(m.posted_at).toLocaleDateString()}</div>
+      <div class="meta">${mentionSourceLabel(m)}${m.points} points · ${new Date(m.posted_at).toLocaleDateString()}</div>
     </div>`).join('');
 
   const owner = p.owner ? `
@@ -242,7 +258,7 @@ async function openProjectProfile(id) {
     </div>
     <div class="p-links">
       <a href="${esc(p.url)}" target="_blank" rel="noopener">View on GitHub →</a>
-      ${p.package ? `<a href="https://www.npmjs.com/package/${esc(p.package.name)}" target="_blank" rel="noopener">View on npm →</a>` : ''}
+      ${(p.packages || []).map((pkg) => packageLink(pkg)).join('')}
     </div>
     <div class="p-section"><h3>At a glance</h3><div class="stat-grid">${stats}</div></div>
     ${sparklineSection(p.snapshots)}
@@ -278,7 +294,7 @@ async function openBuilderProfile(id) {
   const mentions = (b.mentions || []).map((m) => `
     <div class="p-item">
       <a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.title)}</a>
-      <div class="meta">${m.is_show_hn ? 'Show HN · ' : ''}${m.points} points</div>
+      <div class="meta">${mentionSourceLabel(m)}${m.points} points</div>
     </div>`).join('');
 
   const badges = [
