@@ -56,6 +56,33 @@ export const config = {
     ],
   },
 
+  // Founder-dense employer signal — companies whose technical employees
+  // disproportionately go on to found startups. Discovery is two-pronged:
+  // public GitHub org-member enumeration (orgSlug) + bio/company text match
+  // (textMatch). Every orgSlug below was verified live against
+  // GET /orgs/{slug} before shipping. orgSlug: null = no legitimate public
+  // GitHub org exists (Ramp) or the org has zero public members (Anduril
+  // keeps its slug for future-proofing but currently yields nothing) —
+  // text matching is the only real signal for those.
+  founderDenseEmployers: {
+    companies: [
+      { name: 'Palantir',   orgSlug: 'palantir',   textMatch: [/\bpalantir\b/i] },
+      { name: 'Stripe',     orgSlug: 'stripe',     textMatch: [/\bstripe\b/i] },
+      { name: 'Anduril',    orgSlug: 'anduril',    textMatch: [/\banduril\b/i] }, // org has 0 public members — text match is the only real signal
+      { name: 'OpenAI',     orgSlug: 'openai',     textMatch: [/\bopenai\b/i] },
+      { name: 'Anthropic',  orgSlug: 'anthropics', textMatch: [/\banthropic\b/i] }, // slug has trailing 's'; display name does not
+      { name: 'Scale AI',   orgSlug: 'scaleapi',   textMatch: [/\bscale\s?ai\b/i] }, // NOT bare \bscale\b — matches "at scale" everywhere
+      { name: 'Databricks', orgSlug: 'databricks', textMatch: [/\bdatabricks\b/i] },
+      { name: 'Ramp',       orgSlug: null,         textMatch: [/\bramp\b/i] }, // no public GitHub org for the fintech — highest false-positive risk (common word)
+      { name: 'Brex',       orgSlug: 'brexhq',     textMatch: [/\bbrex\b/i] },
+      { name: 'Notion',     orgSlug: 'makenotion', textMatch: [/\bnotion\b/i] }, // common English word — watch for false positives
+      { name: 'Figma',      orgSlug: 'figma',      textMatch: [/\bfigma\b/i] },
+    ],
+    // Enrichment budget for employer-discovered builders — a SEPARATE lane
+    // from the 100/run project-owner budget so the OSS flow can't starve it.
+    orgMemberBudget: { withToken: 100, withoutToken: 0 },
+  },
+
   // Hacker News (Algolia) — earliest trend signal + corroboration.
   hackernews: {
     apiBase: 'https://hn.algolia.com/api/v1',

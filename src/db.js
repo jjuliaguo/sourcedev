@@ -113,6 +113,9 @@ for (const col of [
   'university TEXT',          // matched top-50 university, if any
   'is_student INTEGER DEFAULT 0',
   'profile_summary TEXT',     // LLM-written scout-oriented description
+  'target_employer TEXT',     // matched founder-dense company display name, if any
+  'employer_source TEXT',     // org_member | text_match | NULL — org membership is stronger evidence
+  'discovered_via TEXT',      // project | employer | NULL(legacy) — why this builder row exists
 ]) {
   try { db.exec(`ALTER TABLE builders ADD COLUMN ${col}`); } catch { /* column exists */ }
 }
@@ -148,23 +151,38 @@ export function addSnapshot(projectId, { stars, forks, open_issues }) {
 }
 
 export function upsertBuilder(b) {
+  // discovered_via is intentionally NOT updated on conflict: the first
+  // discovery path (project vs employer) is the row's provenance for good.
   const row = db.prepare(`
-    INSERT INTO builders (login, name, url, avatar_url)
-    VALUES (@login, @name, @url, @avatar_url)
+    INSERT INTO builders (login, name, url, avatar_url, discovered_via)
+    VALUES (@login, @name, @url, @avatar_url, @discovered_via)
     ON CONFLICT(login) DO UPDATE SET avatar_url=excluded.avatar_url
     RETURNING id
-  `).get(b);
+  `).get({ discovered_via: null, ...b });
   return row.id;
 }
 
 export function enrichBuilder(login, d) {
+  // Employer precedence lives here so no caller can get it wrong: a
+  // confirmed org_member tag is never downgraded by a later re-enrichment
+  // that only has text-match (or no) employer signal.
   db.prepare(`
     UPDATE builders SET name=@name, followers=@followers, public_repos=@public_repos,
       bio=@bio, company=@company, blog=@blog, twitter=@twitter,
       location=@location, region=@region, university=@university, is_student=@is_student,
+      target_employer = CASE WHEN employer_source='org_member' THEN target_employer ELSE @target_employer END,
+      employer_source = CASE WHEN employer_source='org_member' THEN employer_source ELSE @employer_source END,
       enriched=2
     WHERE login=@login
-  `).run({ login, ...d });
+  `).run({ login, target_employer: null, employer_source: null, ...d });
+}
+
+// Tag a builder as a confirmed public member of a target company's GitHub org.
+// org_member always wins over any prior text_match tag.
+export function tagOrgMember(login, companyName) {
+  db.prepare(`
+    UPDATE builders SET target_employer=?, employer_source='org_member' WHERE login=?
+  `).run(companyName, login);
 }
 
 export function saveBuilderSummary(login, summary) {

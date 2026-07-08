@@ -183,13 +183,14 @@ function builderCard(b) {
         <span class="name">${esc(b.name || b.login)}</span>
         ${b.name ? `<span class="lang">${esc(b.login)}</span>` : ''}
         ${b.university ? `<span class="chip uni">🎓 ${esc(b.university)}${b.is_student ? ' student' : ''}</span>` : ''}
+        ${b.target_employer ? `<span class="chip employer">🏢 ${esc(b.target_employer)}</span>` : ''}
       </div>
       <div class="desc">${esc(b.profile_summary || b.bio || '')}</div>
       <div class="chips">
-        <span class="chip good">Building ${esc((d.bestProject || '').split('/')[1] || d.bestProject)}</span>
+        ${d.bestProject ? `<span class="chip good">Building ${esc(d.bestProject.split('/')[1] || d.bestProject)}</span>` : ''}
         ${b.location ? `<span class="chip ${b.region === 'north_america' ? 'info' : ''}">📍 ${esc(b.location)}</span>` : ''}
         ${b.followers != null ? `<span class="chip ${b.followers < 500 ? 'notable' : ''}">${fmtNum(b.followers)} followers${b.followers < 500 ? ' — not widely known yet' : ''}</span>` : ''}
-        ${b.company && !b.university ? `<span class="chip">${esc(b.company)}</span>` : ''}
+        ${b.company && !b.university && !b.target_employer ? `<span class="chip">${esc(b.company)}</span>` : ''}
       </div>
     </div>`;
   card.appendChild(triageButtons('builder', b));
@@ -299,6 +300,7 @@ async function openBuilderProfile(id) {
 
   const badges = [
     b.university ? `<span class="chip uni">🎓 ${esc(b.university)}${b.is_student ? ' student' : ''}</span>` : '',
+    b.target_employer ? `<span class="chip employer">🏢 ${esc(b.target_employer)}${b.employer_source === 'org_member' ? ' (confirmed)' : ''}</span>` : '',
     b.location ? `<span class="chip ${b.region === 'north_america' ? 'info' : ''}">📍 ${esc(b.location)}</span>` : '',
   ].filter(Boolean).join(' ');
 

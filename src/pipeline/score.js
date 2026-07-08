@@ -117,8 +117,37 @@ export function scoreProjects() {
   return { projectsScored: scored };
 }
 
+// Base score for a builder with NO owned+scored project. The dominant factor
+// is a founder-dense-employer match (the entire point: strong people at
+// Palantir/Stripe/etc. usually have no breakout public repo — they were
+// invisible to the old project-only scoring). A small technical-activity
+// proxy breaks ties among employer-matched builders. Region/university
+// multipliers are applied by the shared path in scoreBuilders() afterwards —
+// do NOT duplicate them here.
+// NOTE: employerBase was first shipped at 55, which made ~85% of the feed
+// employer-sourced profiles pinned at the 100 cap, crowding out genuinely
+// hot project-sourced builders. 42 keeps an org-confirmed NA match in the
+// feed's upper-middle (~78 with the typical indie×NA stack) while letting
+// breakout OSS signal stay on top — still dominant vs a modest project with
+// the full university stack (52×1.56≈81 vs 40×1.56≈62).
+const NO_PROJECT = {
+  employerBase: 42,
+  sourceBonus: { org_member: 10, text_match: 0 }, // confirmed org membership > a bio regex hit
+  activityMax: 15,
+};
+
+function baseScoreNoProject(b) {
+  if (!b.target_employer) return null; // no project AND no employer — nothing to score on
+  let score = NO_PROJECT.employerBase + (NO_PROJECT.sourceBonus[b.employer_source] ?? 0);
+  const repoActivity = Math.min(1, (b.public_repos ?? 0) / 20);
+  const followerActivity = Math.min(1, (b.followers ?? 0) / 200);
+  score += NO_PROJECT.activityMax * (0.7 * repoActivity + 0.3 * followerActivity);
+  return score; // 55-90 before the shared multiplier stack
+}
+
 export function scoreBuilders() {
-  // Builder score: their best project's emergence + a solo/indie bonus + follower novelty.
+  // Builder score: best owned project's emergence — or, when they own no
+  // scored project, employer-signal base — times indie/region/university.
   const builders = db.prepare(`SELECT * FROM builders`).all();
   let scored = 0;
 
@@ -128,9 +157,18 @@ export function scoreBuilders() {
       FROM projects p JOIN scores sc ON sc.entity_type='project' AND sc.entity_id=p.id
       WHERE p.owner_login=? ORDER BY sc.total DESC LIMIT 1
     `).get(b.login);
-    if (!best) continue;
 
-    let total = best.total;
+    let total, sourceKind;
+    if (best) {
+      total = best.total;
+      sourceKind = 'project';
+    } else {
+      total = baseScoreNoProject(b);
+      sourceKind = 'employer';
+      if (total == null) continue;
+    }
+
+    // --- shared multiplier stack: identical for both paths ---
     // Indie bonus: unknown builders (low followers) shipping something emerging = the exact
     // "pre-company" profile a scout wants. Famous accounts are already discovered.
     if (b.enriched) {
@@ -149,9 +187,13 @@ export function scoreBuilders() {
     total = Math.min(100, total);
 
     saveScore('builder', b.id, total, {
-      bestProject: best.full_name,
-      bestProjectScore: Math.round(best.total * 10) / 10,
+      sourceKind,
+      bestProject: best?.full_name ?? null,
+      bestProjectScore: best ? Math.round(best.total * 10) / 10 : null,
+      targetEmployer: b.target_employer ?? null,
+      employerSource: b.employer_source ?? null,
       followers: b.followers,
+      publicRepos: b.public_repos ?? null,
       indieBonus: b.enriched ? (b.followers < 500 ? 1.15 : b.followers > 10000 ? 0.8 : 1) : null,
       location: b.location ?? null,
       region: b.region ?? null,

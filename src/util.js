@@ -1,4 +1,5 @@
 // Shared helpers.
+import { config } from './config.js';
 
 // Treat text as English-readable if it contains at most a couple of characters
 // from non-Latin scripts (CJK, Hangul, kana, Cyrillic, Arabic, Thai, fullwidth forms).
@@ -125,6 +126,20 @@ export function detectUniversity(text) {
     if (re.test(text)) {
       return { university: name, isStudent: STUDENT_SIGNAL.test(text) };
     }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Founder-dense employer detection in bio/company text.
+// Returns { company } or null. The company list lives in config.js (not here)
+// because it's a targeting knob — add/remove companies without touching
+// classifier logic — unlike the static UNIVERSITIES reference table above.
+
+export function detectFounderDenseEmployer(text) {
+  if (!text || !text.trim()) return null;
+  for (const { name, textMatch } of config.founderDenseEmployers.companies) {
+    if (textMatch.some((re) => re.test(text))) return { company: name };
   }
   return null;
 }

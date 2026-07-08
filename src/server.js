@@ -53,6 +53,7 @@ app.get('/api/feed', (req, res) => {
     let rows = db.prepare(`
       SELECT b.id, b.login, b.name, b.url, b.avatar_url, b.followers, b.bio, b.company, b.blog, b.twitter,
              b.location, b.region, b.university, b.is_student, b.profile_summary,
+             b.target_employer, b.employer_source, b.discovered_via,
              sc.total AS score, sc.breakdown, t.status AS triage
       FROM builders b
       JOIN scores sc ON sc.entity_type='builder' AND sc.entity_id=b.id

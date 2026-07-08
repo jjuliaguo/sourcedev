@@ -28,8 +28,10 @@ Optional environment variables:
 ┌─────────────── INGEST (one source proposes, others confirm) ───────────────┐
 │                                                                             │
 │  GitHub search ──► projects + builders + star snapshots   (the spine)       │
+│  GitHub orgs  ──► builders at founder-dense companies     (future founders) │
 │  HN / Show HN ──► mentions, matched to projects by URL    (earliest signal) │
-│  npm registry ──► weekly downloads for top projects       (adoption proof)  │
+│  Reddit       ──► mentions (needs REDDIT_CLIENT_ID/SECRET) (corroboration)  │
+│  npm + PyPI   ──► weekly downloads for top projects       (adoption proof)  │
 │                                                                             │
 └──────────────────────────────┬──────────────────────────────────────────────┘
                                ▼

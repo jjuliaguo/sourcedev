@@ -108,6 +108,7 @@ h1 { font-family: var(--serif); font-size: 22px; font-weight: 700; }
 .chip.info { color: var(--blue); background: var(--blue-soft); border-color: transparent; }
 .chip.uni { color: #6d28d9; background: #f1e9fd; border-color: transparent; font-weight: 700; }
 .chip.focus { color: #b91c1c; background: #fee2e2; border-color: transparent; font-weight: 700; }
+.chip.employer { color: #0f766e; background: #ccfbf1; border-color: transparent; font-weight: 700; }
 
 .actions { display: flex; flex-direction: column; gap: 7px; justify-content: center; }
 .actions button {

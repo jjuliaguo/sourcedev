@@ -1,6 +1,6 @@
 // Pipeline orchestrator: ingest → score → enrich.
 // Run directly (`npm run ingest`) or import runPipeline() from the server.
-import { ingestGitHub } from '../connectors/github.js';
+import { ingestGitHub, ingestFounderDenseEmployers } from '../connectors/github.js';
 import { ingestHackerNews } from '../connectors/hackernews.js';
 import { ingestReddit } from '../connectors/reddit.js';
 import { ingestNpm } from '../connectors/npm.js';
@@ -13,25 +13,28 @@ export async function runPipeline(log = console.log) {
   const runId = startRun();
   const stats = {};
   try {
-    log('▶ 1/7 GitHub (propose projects + builders)');
+    log('▶ 1/8 GitHub (propose projects + builders)');
     stats.github = await ingestGitHub(log);
 
-    log('▶ 2/7 Hacker News (trend signal + corroboration)');
+    log('▶ 2/8 Founder-dense employers (org enumeration + text-match backfill)');
+    stats.employers = await ingestFounderDenseEmployers(log);
+
+    log('▶ 3/8 Hacker News (trend signal + corroboration)');
     stats.hackernews = await ingestHackerNews(log);
 
-    log('▶ 3/7 Reddit (trend signal + corroboration)');
+    log('▶ 4/8 Reddit (trend signal + corroboration)');
     stats.reddit = await ingestReddit(log);
 
-    log('▶ 4/7 npm (adoption confirmation)');
+    log('▶ 5/8 npm (adoption confirmation)');
     stats.npm = await ingestNpm(log);
 
-    log('▶ 5/7 PyPI (adoption confirmation)');
+    log('▶ 6/8 PyPI (adoption confirmation)');
     stats.pypi = await ingestPyPI(log);
 
-    log('▶ 6/7 Scoring (velocity × novelty × corroboration)');
+    log('▶ 7/8 Scoring (velocity × novelty × corroboration)');
     stats.scoring = scoreAll();
 
-    log('▶ 7/7 Trend + profile enrichment');
+    log('▶ 8/8 Trend + profile enrichment');
     stats.enrichment = await enrichTrends(log);
     stats.profiles = await enrichBuilderProfiles(log);
 
