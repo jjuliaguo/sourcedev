@@ -97,6 +97,19 @@ CREATE TABLE IF NOT EXISTS trends (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- On-demand topic research briefs (Trends-tab search box). Each row is one
+-- multi-source lookup: the synthesized markdown brief + the raw engagement-
+-- ranked sources (HN / Reddit / Polymarket / web) that grounded it.
+CREATE TABLE IF NOT EXISTS research (
+  id INTEGER PRIMARY KEY,
+  topic TEXT NOT NULL,
+  brief TEXT,                          -- synthesized markdown (null in no-key mode)
+  mode TEXT,                           -- 'llm' | 'no-key' | 'error'
+  sources TEXT,                        -- JSON: { hn, reddit, polymarket, web }
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_research_created ON research(created_at);
+
 CREATE TABLE IF NOT EXISTS runs (
   id INTEGER PRIMARY KEY,
   started_at TEXT DEFAULT (datetime('now')),
@@ -241,6 +254,26 @@ export function saveTrend(t) {
       project_ids=excluded.project_ids, score=excluded.score, source=excluded.source,
       created_at=datetime('now')
   `).run(t);
+}
+
+export function saveResearch({ topic, brief, mode, sources }) {
+  return db.prepare(`
+    INSERT INTO research (topic, brief, mode, sources)
+    VALUES (?, ?, ?, ?)
+    RETURNING id
+  `).get(topic, brief ?? null, mode, JSON.stringify(sources ?? {})).id;
+}
+
+export function listResearch(limit = 25) {
+  return db.prepare(
+    `SELECT id, topic, mode, created_at FROM research ORDER BY id DESC LIMIT ?`
+  ).all(limit);
+}
+
+export function getResearchById(id) {
+  const r = db.prepare(`SELECT * FROM research WHERE id=?`).get(id);
+  if (!r) return null;
+  return { ...r, sources: JSON.parse(r.sources || '{}') };
 }
 
 export function startRun() {

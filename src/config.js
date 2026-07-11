@@ -158,6 +158,21 @@ export const config = {
     maxTrends: 8,
   },
 
+  // On-demand topic research (the Trends-tab search box). Same spirit as the
+  // last30days skill: fan out across engagement-ranked sources for any topic,
+  // then synthesize a grounded brief. Reuses the enrichment API key for the
+  // web-grounded synthesis (Gemini + Google Search). Every source here is
+  // free/no-extra-auth in Node — X/YouTube/TikTok need browser cookies or
+  // paid APIs and are intentionally out of scope.
+  research: {
+    hnHits: 12,          // top Algolia stories by relevance
+    redditLimit: 15,     // site-wide search results (needs REDDIT_* creds; skipped otherwise)
+    redditWindow: 'year',// Algolia has no time filter; Reddit search does — keep it recent-ish
+    polymarketEvents: 4, // matched prediction-market events
+    polymarketMarketsPerEvent: 3,
+    maxWebSources: 8,    // grounding citations surfaced from the synthesis
+  },
+
   server: {
     port: Number(process.env.PORT) || 4242,
     // Run the pipeline automatically when the last successful run is older

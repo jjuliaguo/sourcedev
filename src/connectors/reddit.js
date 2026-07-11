@@ -15,7 +15,9 @@ function windowEpoch() {
   return Math.floor((Date.now() - config.windowDays * 86400_000) / 1000);
 }
 
-async function getAccessToken() {
+// Exported so the on-demand topic-research module can reuse the same
+// app-only OAuth (Reddit's unauthenticated .json API is 403'd for cloud IPs).
+export async function getAccessToken() {
   const basic = Buffer.from(`${config.reddit.clientId}:${config.reddit.clientSecret}`).toString('base64');
   const res = await fetch('https://www.reddit.com/api/v1/access_token', {
     method: 'POST',

@@ -58,8 +58,21 @@ Optional environment variables:
 │  Ranked feed UI: Projects / Builders / Trends tabs                           │
 │  Transparent score breakdown chips on every card                             │
 │  save / track / dismiss triage → persisted → future ranker training data     │
+│  Trends tab: on-demand topic research (see below)                            │
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Topic research (Trends tab)
+
+The Trends tab leads with a **"Research any topic"** search box. Type any topic and
+it fans out — in parallel — across engagement-ranked sources, then synthesizes a
+grounded brief (inspired by the [last30days](https://github.com/mvanhorn/last30days-skill)
+skill). Sources: **Hacker News** (relevance), **Reddit** (site-wide search — needs
+`REDDIT_*` creds), **Polymarket** (real-money odds), and the **open web** via Gemini +
+Google Search grounding (needs `GOOGLE_API_KEY`). Without a key it still returns the raw
+engagement-ranked source lists, just no synthesized narrative. Every brief is persisted,
+so the tab keeps a browsable research history. X / YouTube / TikTok are intentionally out
+of scope — they need browser cookies or paid APIs that can't run server-side.
 
 **Key mechanic:** acceleration needs history. The first run scores on lifetime velocity
 (stars ÷ repo age). Every subsequent run adds star snapshots, so recent-window velocity and
@@ -77,7 +90,8 @@ acceleration kick in — the feed gets sharper the longer you run it. Run it dai
 | [src/pipeline/score.js](src/pipeline/score.js) | The emergence formula |
 | [src/pipeline/enrich.js](src/pipeline/enrich.js) | Gemini trend clustering (structured output) + keyword fallback |
 | [src/pipeline/run.js](src/pipeline/run.js) | Orchestrator: ingest → score → enrich, run tracking |
-| [src/server.js](src/server.js) | Express API: `/api/feed`, `/api/triage`, `/api/refresh`, `/api/status` |
+| [src/research.js](src/research.js) | On-demand topic research: HN + Reddit + Polymarket fan-out + Gemini web-grounded synthesis |
+| [src/server.js](src/server.js) | Express API: `/api/feed`, `/api/triage`, `/api/refresh`, `/api/status`, `/api/research` |
 | [public/](public/index.html) | Ranked-feed UI with triage |
 
 ## Roadmap (see STRATEGY.md §9)

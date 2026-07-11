@@ -65,17 +65,30 @@ async function loadFeed() {
   if (savedOnly) params.set('filter', 'saved');
   const res = await fetch(`/api/feed?${params}`);
   const items = await res.json();
+
+  // The Trends tab leads with the on-demand research box, then the clustered
+  // trend cards below — so it renders even when there are no clustered trends.
+  if (currentTab === 'trends') {
+    feed.innerHTML = '';
+    feed.appendChild(researchPanel());
+    loadResearchHistory();
+    if (items.length) {
+      const heading = document.createElement('h2');
+      heading.className = 'section-heading';
+      heading.textContent = 'Emerging trends from your radar';
+      feed.appendChild(heading);
+      for (const item of items) feed.appendChild(trendCard(item));
+    }
+    return;
+  }
+
   if (!items.length) {
     feed.innerHTML = `<div class="empty">Nothing here yet — hit Refresh to gather signals.</div>`;
     return;
   }
   feed.innerHTML = '';
   for (const item of items) {
-    feed.appendChild(
-      currentTab === 'projects' ? projectCard(item)
-      : currentTab === 'builders' ? builderCard(item)
-      : trendCard(item)
-    );
+    feed.appendChild(currentTab === 'projects' ? projectCard(item) : builderCard(item));
   }
 }
 
@@ -196,6 +209,152 @@ function builderCard(b) {
   card.appendChild(triageButtons('builder', b));
   card.addEventListener('click', () => openBuilderProfile(b.id));
   return card;
+}
+
+// ---------- topic research (Trends tab) ----------
+
+let researchBusy = false;
+
+function researchPanel() {
+  const wrap = document.createElement('div');
+  wrap.className = 'research';
+  wrap.innerHTML = `
+    <div class="research-intro">
+      <h2 class="section-heading">Research any topic</h2>
+      <p class="research-sub">Fan out across Hacker News, Reddit, Polymarket and the open web, ranked by real engagement — then get a grounded summary.</p>
+      <form class="research-form" id="research-form">
+        <input type="text" id="research-input" placeholder="e.g. local-first sync engines, LLM eval tooling, AI code review…" autocomplete="off" />
+        <button type="submit" id="research-go">Research</button>
+      </form>
+      <div class="research-history" id="research-history"></div>
+    </div>
+    <div class="research-result" id="research-result"></div>`;
+
+  wrap.querySelector('#research-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    runResearch(wrap.querySelector('#research-input').value);
+  });
+  return wrap;
+}
+
+async function runResearch(topic) {
+  topic = (topic || '').trim();
+  if (!topic || researchBusy) return;
+  researchBusy = true;
+  const go = document.getElementById('research-go');
+  const result = document.getElementById('research-result');
+  if (go) { go.disabled = true; go.textContent = 'Researching…'; }
+  result.innerHTML = `<div class="research-loading">Gathering signals across HN, Reddit, Polymarket &amp; the web — this takes a few seconds…</div>`;
+  try {
+    const res = await fetch('/api/research', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+    renderResearchResult(await res.json());
+    loadResearchHistory();
+  } catch (e) {
+    result.innerHTML = `<div class="research-error">Research failed: ${esc(e.message)}</div>`;
+  } finally {
+    researchBusy = false;
+    if (go) { go.disabled = false; go.textContent = 'Research'; }
+  }
+}
+
+async function loadResearchHistory() {
+  const box = document.getElementById('research-history');
+  if (!box) return;
+  const rows = await fetch('/api/research').then((r) => r.json()).catch(() => []);
+  if (!rows.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<span class="research-history-label">Recent:</span>`;
+  for (const r of rows.slice(0, 8)) {
+    const chip = document.createElement('button');
+    chip.className = 'research-chip';
+    chip.textContent = r.topic;
+    chip.addEventListener('click', () => openResearch(r.id));
+    box.appendChild(chip);
+  }
+}
+
+async function openResearch(id) {
+  const result = document.getElementById('research-result');
+  result.innerHTML = `<div class="research-loading">Loading…</div>`;
+  const data = await fetch(`/api/research/${id}`).then((r) => r.json()).catch(() => null);
+  if (data) renderResearchResult(data);
+}
+
+function renderResearchResult(data) {
+  const result = document.getElementById('research-result');
+  const s = data.sources || {};
+
+  const briefHtml = data.brief
+    ? `<div class="research-brief">${mdToHtml(data.brief)}</div>`
+    : `<div class="research-note">No synthesized summary — set <code>GOOGLE_API_KEY</code> to enable the grounded web brief. Raw sources below.</div>`;
+
+  const sourceList = (items, render) =>
+    items && items.length ? `<ul class="research-sources">${items.map(render).join('')}</ul>` : '';
+
+  const hn = sourceList(s.hn, (h) =>
+    `<li><a href="${esc(h.url)}" target="_blank" rel="noopener">${esc(h.title)}</a>
+     <span class="src-meta">${h.points} pts · ${h.comments} comments</span></li>`);
+
+  const reddit = s.redditSkipped
+    ? `<p class="research-note-sm">Reddit skipped — set <code>REDDIT_CLIENT_ID</code>/<code>REDDIT_CLIENT_SECRET</code> to include it.</p>`
+    : sourceList(s.reddit, (r) =>
+        `<li><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a>
+         <span class="src-meta">${r.points} upvotes · r/${esc(r.subreddit)}</span></li>`);
+
+  const polymarket = sourceList(s.polymarket, (e) =>
+    `<li><a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>
+     <span class="src-meta">$${fmtNum(e.volume)} volume</span>
+     <div class="src-odds">${(e.markets || []).map((m) =>
+       `<span class="odds-chip">${esc(m.question)} → ${esc(m.outcome)} ${Math.round(m.prob * 100)}%</span>`).join('')}</div></li>`);
+
+  const web = sourceList(s.web, (w) =>
+    `<li><a href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.title)}</a></li>`);
+
+  const section = (title, body) => body
+    ? `<div class="research-source-group"><h4>${title}</h4>${body}</div>` : '';
+
+  result.innerHTML = `
+    <div class="research-card">
+      <div class="research-topic">${esc(data.topic)}</div>
+      ${briefHtml}
+      <div class="research-source-cols">
+        ${section('Hacker News', hn)}
+        ${section('Reddit', reddit)}
+        ${section('Polymarket', polymarket)}
+        ${section('Around the web', web)}
+      </div>
+      ${s.unavailable && s.unavailable.length
+        ? `<div class="research-note-sm">Not searched (need browser auth or paid APIs): ${s.unavailable.map(esc).join(', ')}.</div>` : ''}
+    </div>`;
+}
+
+// Minimal, safe Markdown → HTML. Escapes first, then applies a small subset
+// (headings, bold, inline links, bullet lists, paragraphs) — enough for the
+// synthesized briefs without pulling in a markdown dependency.
+function mdToHtml(md) {
+  const lines = esc(md).split('\n');
+  const out = [];
+  let inList = false;
+  const inline = (t) => t
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const closeList = () => { if (inList) { out.push('</ul>'); inList = false; } };
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) { closeList(); continue; }
+    let m;
+    if ((m = line.match(/^#{1,4}\s+(.*)$/))) { closeList(); out.push(`<h4>${inline(m[1])}</h4>`); }
+    else if ((m = line.match(/^[-*]\s+(.*)$/))) {
+      if (!inList) { out.push('<ul>'); inList = true; }
+      out.push(`<li>${inline(m[1])}</li>`);
+    } else { closeList(); out.push(`<p>${inline(line)}</p>`); }
+  }
+  closeList();
+  return out.join('');
 }
 
 function trendCard(t) {

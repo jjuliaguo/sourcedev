@@ -2,10 +2,11 @@
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
-import { db, setTriage, getPackagesForProject } from './db.js';
+import { db, setTriage, getPackagesForProject, saveResearch, listResearch, getResearchById } from './db.js';
 import { runPipeline } from './pipeline/run.js';
 import { fetchAndEnrichBuilder } from './connectors/github.js';
 import { summarizeBuilders } from './pipeline/enrich.js';
+import { runResearch } from './research.js';
 import { isMostlyEnglish, isConsumerApp, isMirrorOrBoilerplate } from './util.js';
 
 const app = express();
@@ -170,6 +171,33 @@ app.get('/api/builder/:id', async (req, res) => {
     triage: triage?.status ?? null,
     projects, mentions,
   });
+});
+
+// ---- topic research (Trends-tab search box) ----
+// On-demand multi-source lookup + grounded synthesis for any topic. Persisted
+// so the Trends tab keeps a browsable history of past research.
+
+app.get('/api/research', (req, res) => {
+  res.json(listResearch());
+});
+
+app.get('/api/research/:id', (req, res) => {
+  const r = getResearchById(Number(req.params.id));
+  if (!r) return res.status(404).json({ error: 'not found' });
+  res.json(r);
+});
+
+app.post('/api/research', async (req, res) => {
+  const topic = String(req.body?.topic ?? '').trim();
+  if (!topic) return res.status(400).json({ error: 'topic required' });
+  try {
+    const result = await runResearch(topic);
+    const id = saveResearch(result);
+    res.json({ id, ...result });
+  } catch (e) {
+    console.error('research failed:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ---- triage (the training-data loop) ----

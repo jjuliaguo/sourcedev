@@ -189,3 +189,80 @@ h1 { font-family: var(--serif); font-size: 22px; font-weight: 700; }
 
 .sparkline { width: 100%; height: 60px; margin-top: 4px; }
 .p-loading { color: var(--text-faint); text-align: center; padding: 50px 0; }
+
+/* ---- topic research (Trends tab) ---- */
+.section-heading { font-family: var(--serif); font-size: 19px; font-weight: 700; margin: 6px 0 14px; }
+.research { margin-bottom: 26px; }
+.research-intro {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow); padding: 22px 24px;
+}
+.research-intro .section-heading { margin-top: 0; margin-bottom: 4px; }
+.research-sub { color: var(--text-soft); font-size: 14.5px; margin-bottom: 16px; }
+.research-form { display: flex; gap: 10px; }
+.research-form input {
+  flex: 1; font-family: var(--sans); font-size: 15px; color: var(--text);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 11px 15px; outline: none;
+}
+.research-form input:focus { border-color: var(--green); background: var(--card); }
+.research-form button {
+  background: var(--green); color: #fff; border: none; border-radius: 8px;
+  font-family: var(--sans); font-size: 15px; font-weight: 600;
+  padding: 11px 22px; cursor: pointer; white-space: nowrap;
+}
+.research-form button:hover { filter: brightness(1.08); }
+.research-form button:disabled { opacity: 0.55; cursor: wait; }
+
+.research-history { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 12px; }
+.research-history-label { font-size: 12.5px; color: var(--text-faint); font-weight: 600; }
+.research-chip {
+  font-size: 12.5px; font-weight: 600; color: var(--text-soft);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 20px;
+  padding: 4px 12px; cursor: pointer; font-family: var(--sans);
+}
+.research-chip:hover { color: var(--green); border-color: var(--green); }
+
+.research-loading, .research-error, .research-note, .research-note-sm { font-size: 14px; }
+.research-loading { color: var(--text-faint); text-align: center; padding: 34px 0; }
+.research-error { color: var(--red); padding: 16px 0; }
+.research-note { color: var(--text-soft); background: var(--amber-soft); border-radius: 8px; padding: 10px 14px; margin: 4px 0 14px; }
+.research-note-sm { color: var(--text-faint); font-size: 12.5px; margin-top: 12px; }
+.research-note code, .research-note-sm code { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+
+.research-result { margin-top: 16px; }
+.research-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow); padding: 22px 24px;
+}
+.research-topic { font-family: var(--serif); font-size: 21px; font-weight: 700; margin-bottom: 12px; }
+.research-brief { color: var(--text); }
+.research-brief h4 {
+  font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--text-faint); margin: 18px 0 8px;
+}
+.research-brief p { margin: 8px 0; color: var(--text-soft); }
+.research-brief ul { margin: 8px 0 8px 20px; color: var(--text-soft); }
+.research-brief li { margin: 4px 0; }
+.research-brief a { color: var(--blue); text-decoration: none; }
+.research-brief a:hover { text-decoration: underline; }
+.research-brief strong { color: var(--text); }
+
+.research-source-cols {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px;
+  margin-top: 22px; border-top: 1px solid var(--border); padding-top: 18px;
+}
+.research-source-group h4 {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text-faint); margin-bottom: 10px;
+}
+.research-sources { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.research-sources li { font-size: 14px; line-height: 1.4; }
+.research-sources a { color: var(--blue); text-decoration: none; font-weight: 600; }
+.research-sources a:hover { text-decoration: underline; }
+.src-meta { display: block; font-size: 12px; color: var(--text-faint); margin-top: 1px; }
+.src-odds { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+.odds-chip {
+  font-size: 11.5px; font-weight: 600; color: var(--amber);
+  background: var(--amber-soft); border-radius: 14px; padding: 2px 9px;
+}
